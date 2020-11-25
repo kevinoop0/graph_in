@@ -105,7 +105,7 @@ class Model(nn.Module):
         super().__init__()
         self.vgg_encoder = VGGEncoder()
         self.decoder = Decoder()
-        self.gcn = GCN(nfeat=512, nhid=256, nclass=512, dropout=0.5)
+        self.gcn = GCN(nfeat=512, nhid=512, nclass=512, dropout=0.3)
 
     def gcn_in(self, cf, sf):
         # [8, 512, 32, 32]
@@ -113,12 +113,13 @@ class Model(nn.Module):
         sf_flaten = sf.reshape(sf.shape[0], -1)
         A = torch.mm(sf_flaten, sf_flaten.T) # bs*bs
         # ipdb.set_trace()
-        A_norm = torch.div(A, A.max())
+        A_norm = torch.div(A, A.max(dim=0)[0])
         sf_mean_new = self.gcn(sf_mean_init, A_norm).reshape(sf.shape[0], sf.shape[1], 1, 1)
         cf_mean, cf_std = calc_mean_std(cf)
         _, sf_std = calc_mean_std(sf)
         # [8, 512, 32, 32]
         normalized_features = sf_std * (cf - cf_mean) / cf_std + sf_mean_new
+        
         return normalized_features
 
     def generate(self, content_images, style_images, alpha=1.0):
@@ -126,7 +127,7 @@ class Model(nn.Module):
         style_features = self.vgg_encoder(style_images, output_last_feature=True)
         # t = adain(content_features, style_features)
         t = self.gcn_in(content_features, style_features)
-        t = alpha * t + (1 - alpha) * content_features
+        # t = alpha * t + (1 - alpha) * content_features
         out = self.decoder(t)
         return out
 
@@ -148,7 +149,7 @@ class Model(nn.Module):
         style_features = self.vgg_encoder(style_images, output_last_feature=True)
         # t = adain(content_features, style_features)
         t = self.gcn_in(content_features, style_features)
-        t = alpha * t + (1 - alpha) * content_features
+        # t = alpha * t + (1 - alpha) * content_features
         out = self.decoder(t)
 
         output_features = self.vgg_encoder(out, output_last_feature=True)
@@ -157,5 +158,5 @@ class Model(nn.Module):
 
         loss_c = self.calc_content_loss(output_features, t)
         loss_s = self.calc_style_loss(output_middle_features, style_middle_features)
-        loss = loss_c + lam * loss_s
-        return loss, out
+        # loss = loss_c + lam * loss_s
+        return loss_c, loss_s, out
