@@ -14,13 +14,13 @@ import numpy as np
 
 
 class Config(object):
-    epoch = 15
-    lr = 5e-5
+    epoch = 10
+    lr = 1e-4
     batch_size = 16
-    gpu_id = 'cuda:0'
+    gpu_id = 'cuda:1'
     loss_interval = 10
-    img_interval = 500
-    test_bs = 3
+    img_interval = 200
+    test_bs = 4
 
 
 def train(**kwargs):
@@ -29,7 +29,7 @@ def train(**kwargs):
         setattr(opt, k, v)
 
     device = torch.device(opt.gpu_id)
-    vis = visdom.Visdom(env='gin')  # python -m visdom.server
+    vis = visdom.Visdom(port=2333, env='gin')  # python -m visdom.server -p 2333
 
     train_dataset = PreprocessDataset(
         '/data/lzd/train_data/content', '/data/lzd/train_data/style')
@@ -50,16 +50,15 @@ def train(**kwargs):
     model = Model().to(device)
     optimizer = Adam([
         {'params': model.decoder.parameters(), 'lr': opt.lr},
-        {'params': model.gcn.parameters(), 'lr': opt.lr*10}], lr=opt.lr)
+        {'params': model.gat.parameters(), 'lr': 0.0005}], lr=opt.lr)
 
     for e in range(1, opt.epoch):
         print(f'start {e} epoch:')
         for i, (content, style) in enumerate(train_loader, 1):
             content = content.to(device)  # [8, 3, 256, 256]
             style = style.to(device)  # [8, 3, 256, 256]
-            loss_c, loss_s, _ = model(content, style)
-            loss = loss_c + 10 * loss_s
-
+            loss_c, loss_s = model(content, style)
+            loss = loss_c + 2 * loss_s
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -98,4 +97,5 @@ def train(**kwargs):
 
 
 if __name__ == '__main__':
+    train()
     fire.Fire()
